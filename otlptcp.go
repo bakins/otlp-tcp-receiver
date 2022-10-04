@@ -20,7 +20,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
 
-	"github.com/bakins/otlptcp/internal/sharedcomponent"
+	"github.com/bakins/otlptcpreceiver/internal/sharedcomponent"
 )
 
 const (
