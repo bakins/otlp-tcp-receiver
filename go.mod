@@ -1,4 +1,4 @@
-module github.com/bakins/otlp-tcp-receiver
+module github.com/bakins/otlptcpreceiver
 
 go 1.19
 
