@@ -16,7 +16,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	semconv "go.opentelemetry.io/collector/semconv/v1.5.0"
 
-	"github.com/bakins/otlptcp/internal/sharedcomponent"
+	"github.com/bakins/otlptcpreceiver/internal/sharedcomponent"
 )
 
 func TestTraces(t *testing.T) {
