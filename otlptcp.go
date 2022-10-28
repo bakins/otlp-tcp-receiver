@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/akutz/memconn"
 	"github.com/jpillora/backoff"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator/helper"
 	"go.opentelemetry.io/collector/component"
@@ -27,7 +26,6 @@ const (
 	typeStr = "otlptcp"
 
 	defaultAddress = "0.0.0.0:14317"
-	defaultNetwork = "tcp"
 
 	// DefaultMaxMessageSize is the max buffer sized used
 	// if MaxMessageSize is not set
@@ -56,7 +54,6 @@ func createDefaultConfig() config.Receiver {
 	return &Config{
 		ReceiverSettings: config.NewReceiverSettings(config.NewComponentID(typeStr)),
 		ListenAddress:    defaultAddress,
-		ListenNetwork:    defaultNetwork,
 		MaxMessageSize:   DefaultMaxMessageSize,
 	}
 }
@@ -65,7 +62,6 @@ func createDefaultConfig() config.Receiver {
 type Config struct {
 	config.ReceiverSettings `mapstructure:",squash"`
 	ListenAddress           string          `mapstructure:"listen_address,omitempty"`
-	ListenNetwork           string          `mapstructure:"listen_network,omitempty"`
 	MaxMessageSize          helper.ByteSize `mapstructure:"max_message_size,omitempty"`
 }
 
@@ -148,7 +144,7 @@ func newOtlpReceiver(cfg *Config, settings component.ReceiverCreateSettings) *ot
 }
 
 func (r *otlpReceiver) Start(_ context.Context, host component.Host) error {
-	listener, err := memconn.Listen(r.cfg.ListenNetwork, r.cfg.ListenAddress)
+	listener, err := net.Listen("tcp", r.cfg.ListenAddress)
 	if err != nil {
 		return fmt.Errorf("failed to configure tcp listener: %w", err)
 	}
