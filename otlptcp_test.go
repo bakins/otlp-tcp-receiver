@@ -3,10 +3,10 @@ package otlptcp
 import (
 	"context"
 	"encoding/binary"
+	"net"
 	"testing"
 	"time"
 
-	"github.com/akutz/memconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component/componenttest"
@@ -27,7 +27,6 @@ func TestTraces(t *testing.T) {
 	cfg := &Config{
 		ReceiverSettings: config.NewReceiverSettings(config.NewComponentID(typeStr)),
 		ListenAddress:    "127.0.0.1:0",
-		ListenNetwork:    "tcp",
 	}
 
 	var sink consumertest.TracesSink
@@ -71,7 +70,7 @@ func TestTraces(t *testing.T) {
 
 	otlp := tr.(*sharedcomponent.SharedComponent).Unwrap().(*otlpReceiver)
 
-	conn, err := memconn.Dial("tcp", otlp.listener.Addr().String())
+	conn, err := net.Dial("tcp", otlp.listener.Addr().String())
 	require.NoError(t, err)
 
 	prefix := []byte{MessageTypeTrace, 0, 0, 0, 0}

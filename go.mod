@@ -3,7 +3,6 @@ module github.com/bakins/otlptcpreceiver
 go 1.19
 
 require (
-	github.com/akutz/memconn v0.1.0
 	github.com/jpillora/backoff v1.0.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.61.0
 	github.com/stretchr/testify v1.8.0
