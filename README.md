@@ -33,7 +33,7 @@ Availible configuration options:
 
 - `listen_address` - listening address in the form of `<ip>:port`. default is `0.0.0.0:14317`
 - `max_message_size` - maximum size of a single message. Default to 1m.
-- `listen_network` - listent network.  Only `tcp` is generally supported, but the special values `memu` and `memb` use https://github.com/akutz/memconn for in-memory use cases.
+- `listen_network` - listent network.  Only `tcp` is supported.
 
 
 ## Usage in collector
