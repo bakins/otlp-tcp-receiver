@@ -12,11 +12,11 @@ import (
 	"github.com/jpillora/backoff"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator/helper"
 	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.opentelemetry.io/collector/receiver"
 	"go.uber.org/zap"
 
 	"github.com/bakins/otlptcpreceiver/internal/sharedcomponent"
@@ -40,72 +40,82 @@ const (
 )
 
 // NewFactory creates a new OTLP TCP receiver factory.
-func NewFactory() component.ReceiverFactory {
-	return component.NewReceiverFactory(
+func NewFactory() receiver.Factory {
+	return receiver.NewFactory(
 		typeStr,
 		createDefaultConfig,
-		component.WithTracesReceiver(createTracesReceiver, component.StabilityLevelStable),
-		component.WithMetricsReceiver(createMetricsReceiver, component.StabilityLevelStable),
-		component.WithLogsReceiver(createLogReceiver, component.StabilityLevelBeta),
+		receiver.WithTraces(createTracesReceiver, component.StabilityLevelStable),
+		receiver.WithMetrics(createMetricsReceiver, component.StabilityLevelStable),
+		receiver.WithLogs(createLogReceiver, component.StabilityLevelBeta),
 	)
 }
 
-func createDefaultConfig() config.Receiver {
+func createDefaultConfig() component.Config {
 	return &Config{
-		ReceiverSettings: config.NewReceiverSettings(config.NewComponentID(typeStr)),
-		ListenAddress:    defaultAddress,
-		MaxMessageSize:   DefaultMaxMessageSize,
+		ListenAddress:  defaultAddress,
+		MaxMessageSize: DefaultMaxMessageSize,
 	}
 }
 
 // Config defines configuration for OTLP TCP receiver.
 type Config struct {
-	config.ReceiverSettings `mapstructure:",squash"`
-	ListenAddress           string          `mapstructure:"listen_address,omitempty"`
-	MaxMessageSize          helper.ByteSize `mapstructure:"max_message_size,omitempty"`
+	ListenAddress  string          `mapstructure:"listen_address,omitempty"`
+	MaxMessageSize helper.ByteSize `mapstructure:"max_message_size,omitempty"`
 }
 
 func createTracesReceiver(
 	_ context.Context,
-	set component.ReceiverCreateSettings,
-	cfg config.Receiver,
+	set receiver.CreateSettings,
+	cfg component.Config,
 	nextConsumer consumer.Traces,
-) (component.TracesReceiver, error) {
-	r := receivers.GetOrAdd(cfg, func() component.Component {
-		return newOtlpReceiver(cfg.(*Config), set)
+) (receiver.Traces, error) {
+	oCfg := cfg.(*Config)
+	r, err := receivers.GetOrAdd(oCfg, func() (*otlpReceiver, error) {
+		return newOtlpReceiver(oCfg, set)
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	r.Unwrap().(*otlpReceiver).nextTraceConsumer = nextConsumer
+	r.Unwrap().nextTraceConsumer = nextConsumer
 
 	return r, nil
 }
 
 func createMetricsReceiver(
 	_ context.Context,
-	set component.ReceiverCreateSettings,
-	cfg config.Receiver,
+	set receiver.CreateSettings,
+	cfg component.Config,
 	consumer consumer.Metrics,
-) (component.MetricsReceiver, error) {
-	r := receivers.GetOrAdd(cfg, func() component.Component {
-		return newOtlpReceiver(cfg.(*Config), set)
+) (receiver.Metrics, error) {
+	oCfg := cfg.(*Config)
+	r, err := receivers.GetOrAdd(oCfg, func() (*otlpReceiver, error) {
+		return newOtlpReceiver(oCfg, set)
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	r.Unwrap().(*otlpReceiver).nextMetricConsumer = consumer
+	r.Unwrap().nextMetricConsumer = consumer
 
 	return r, nil
 }
 
 func createLogReceiver(
 	_ context.Context,
-	set component.ReceiverCreateSettings,
-	cfg config.Receiver,
+	set receiver.CreateSettings,
+	cfg component.Config,
 	consumer consumer.Logs,
-) (component.LogsReceiver, error) {
-	r := receivers.GetOrAdd(cfg, func() component.Component {
-		return newOtlpReceiver(cfg.(*Config), set)
+) (receiver.Logs, error) {
+	oCfg := cfg.(*Config)
+	r, err := receivers.GetOrAdd(oCfg, func() (*otlpReceiver, error) {
+		return newOtlpReceiver(oCfg, set)
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	r.Unwrap().(*otlpReceiver).nextLogConsumer = consumer
+	r.Unwrap().nextLogConsumer = consumer
 
 	return r, nil
 }
@@ -119,11 +129,11 @@ type otlpReceiver struct {
 	cfg                *Config
 	logger             *zap.Logger
 	cancel             context.CancelFunc
-	settings           component.ReceiverCreateSettings
+	settings           receiver.CreateSettings
 	backoff            backoff.Backoff
 }
 
-func newOtlpReceiver(cfg *Config, settings component.ReceiverCreateSettings) *otlpReceiver {
+func newOtlpReceiver(cfg *Config, settings receiver.CreateSettings) (*otlpReceiver, error) {
 	logger := settings.TelemetrySettings.Logger
 	if logger == nil {
 		logger = zap.NewNop()
@@ -140,7 +150,7 @@ func newOtlpReceiver(cfg *Config, settings component.ReceiverCreateSettings) *ot
 		logger: logger,
 	}
 
-	return r
+	return r, nil
 }
 
 func (r *otlpReceiver) Start(_ context.Context, host component.Host) error {
@@ -211,9 +221,9 @@ func (r *otlpReceiver) goHandleMessages(ctx context.Context, conn net.Conn, canc
 
 		buf := make([]byte, 0, bufSize)
 
-		traceUnmarshaler := ptrace.NewProtoUnmarshaler()
-		metricUnmarshaler := pmetric.NewProtoUnmarshaler()
-		logUnmarshaler := plog.NewProtoUnmarshaler()
+		traceUnmarshaler := &ptrace.ProtoUnmarshaler{}
+		metricUnmarshaler := &pmetric.ProtoUnmarshaler{}
+		logUnmarshaler := &plog.ProtoUnmarshaler{}
 
 		for {
 			prefix := []byte{0, 0, 0, 0, 0}
@@ -320,4 +330,4 @@ func (r *otlpReceiver) Shutdown(ctx context.Context) error {
 // create separate objects, they must use one otlpReceiver object per configuration.
 // When the receiver is shutdown it should be removed from this map so the same configuration
 // can be recreated successfully.
-var receivers = sharedcomponent.NewSharedComponents()
+var receivers = sharedcomponent.NewSharedComponents[*Config, *otlpReceiver]()

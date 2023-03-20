@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component/componenttest"
-	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.opentelemetry.io/collector/receiver/receivertest"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 
@@ -25,8 +25,7 @@ func TestTraces(t *testing.T) {
 	defer cancel()
 
 	cfg := &Config{
-		ReceiverSettings: config.NewReceiverSettings(config.NewComponentID(typeStr)),
-		ListenAddress:    "127.0.0.1:0",
+		ListenAddress: "127.0.0.1:0",
 	}
 
 	var sink consumertest.TracesSink
@@ -38,7 +37,7 @@ func TestTraces(t *testing.T) {
 
 	tr, err := NewFactory().CreateTracesReceiver(
 		ctx,
-		componenttest.NewNopReceiverCreateSettings(),
+		receivertest.NewNopCreateSettings(),
 		cfg,
 		&w)
 	require.NoError(t, err)
@@ -68,7 +67,7 @@ func TestTraces(t *testing.T) {
 	data, err := proto.Marshal(&traces)
 	require.NoError(t, err)
 
-	otlp := tr.(*sharedcomponent.SharedComponent).Unwrap().(*otlpReceiver)
+	otlp := tr.(*sharedcomponent.SharedComponent[*otlpReceiver]).Unwrap()
 
 	conn, err := net.Dial("tcp", otlp.listener.Addr().String())
 	require.NoError(t, err)
